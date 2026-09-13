@@ -1,0 +1,174 @@
+{
+  "search_settings": {
+    "description": "搜索设置",
+    "type": "object",
+    "items": {
+      "max_results": {
+        "description": "默认返回条数",
+        "type": "int",
+        "default": 8,
+        "hint": "3 到 15 之间"
+      },
+      "timeout_seconds": {
+        "description": "请求超时（秒）",
+        "type": "int",
+        "default": 15
+      },
+      "cache_ttl": {
+        "description": "结果缓存（秒）",
+        "type": "int",
+        "default": 600,
+        "hint": "相同查询在缓存期内直接复用，0 表示不缓存"
+      },
+      "min_interval": {
+        "description": "同一用户调用间隔（秒）",
+        "type": "int",
+        "default": 3,
+        "hint": "防止刷接口被必应拉黑"
+      },
+      "max_output_chars": {
+        "description": "返回给模型的字符上限",
+        "type": "int",
+        "default": 4000
+      },
+      "page_chars": {
+        "description": "网页正文抓取字符上限",
+        "type": "int",
+        "default": 6000
+      },
+      "market": {
+        "description": "搜索地区",
+        "type": "string",
+        "default": "zh-CN",
+        "options": [
+          "zh-CN",
+          "en-US",
+          "ja-JP"
+        ]
+      },
+      "proxy": {
+        "description": "HTTP 代理（留空不用）",
+        "type": "string",
+        "default": ""
+      },
+      "user_agent": {
+        "description": "自定义 User-Agent",
+        "type": "string",
+        "default": ""
+      },
+      "allow_private_hosts": {
+        "description": "允许读取内网地址",
+        "type": "bool",
+        "default": false,
+        "hint": "默认只允许公网地址，防止被诱导读取内网服务或云元数据；除非明确要读自己的内网站点，否则别开"
+      },
+      "engines": {
+        "description": "启用的搜索引擎",
+        "type": "list",
+        "default": ["bing_rss", "bing"],
+        "hint": "可选 bing_rss（必应 RSS，结构化、无广告、带发布时间、排序权重更高，但每次最多 10 条且不吃时间过滤）/ bing（必应网页，能按时间筛）；多选会并集去重后按可信度统一重排；其它引擎在机房出口 IP 下基本抓不动"
+      },
+      "query_optimize": {
+        "description": "自动清洗搜索词",
+        "type": "bool",
+        "default": true,
+        "hint": "去掉「帮我查一下」「谢谢喵」这类礼貌词和表情，显著提升召回"
+      },
+      "dedupe_similar": {
+        "description": "按标题相似度去重",
+        "type": "bool",
+        "default": true,
+        "hint": "同域名下标题高度相似的结果只留一条，压制转载刷屏"
+      },
+      "llm_rewrite": {
+        "description": "用模型改写搜索词",
+        "type": "bool",
+        "default": false,
+        "hint": "先让当前对话模型把整句话压成关键词再搜，效果更好但每次搜索多花一次模型调用"
+      }
+    }
+  },
+  "tool_settings": {
+    "description": "工具设置",
+    "type": "object",
+    "items": {
+      "enable_search": {
+        "description": "启用联网搜索工具",
+        "type": "bool",
+        "default": true
+      },
+      "enable_fetch": {
+        "description": "启用网页读取工具",
+        "type": "bool",
+        "default": true
+      },
+      "send_sources": {
+        "description": "把来源链接单独发给用户",
+        "type": "bool",
+        "default": false
+      }
+    }
+  },
+  "filter_settings": {
+    "description": "结果净化（反广告 / 反山寨）",
+    "type": "object",
+    "items": {
+      "filter_ads": {
+        "description": "过滤广告位与跳转广告",
+        "type": "bool",
+        "default": true
+      },
+      "anti_fake_level": {
+        "description": "反山寨强度",
+        "type": "string",
+        "default": "normal",
+        "options": [
+          "off",
+          "normal",
+          "strict"
+        ],
+        "hint": "off 不判断；normal 可疑结果打标并沉底但保留；strict 直接剔除可疑结果"
+      },
+      "max_per_domain": {
+        "description": "同一域名最多保留条数",
+        "type": "int",
+        "default": 2,
+        "hint": "0 表示不限制，防止单一站点刷屏"
+      },
+      "block_domains": {
+        "description": "强制屏蔽的域名",
+        "type": "list",
+        "default": [],
+        "hint": "填域名后缀即可，例如 aifreeapi.com，命中直接丢弃"
+      },
+      "trust_domains": {
+        "description": "额外信任的域名",
+        "type": "list",
+        "default": [],
+        "hint": "命中后免检并置顶，例如 docs.example.com"
+      }
+    }
+  },
+  "scope_settings": {
+    "description": "作用范围",
+    "type": "object",
+    "items": {
+      "enable_in_group": {
+        "description": "群聊可用",
+        "type": "bool",
+        "default": true
+      },
+      "enable_in_private": {
+        "description": "私聊可用",
+        "type": "bool",
+        "default": true
+      },
+      "group_whitelist": {
+        "description": "群白名单",
+        "type": "list",
+        "default": [],
+        "hint": "留空表示所有群可用，填写后仅这些群生效"
+      }
+    }
+  }
+}

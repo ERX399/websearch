@@ -1,0 +1,14 @@
+name: websearch
+display_name: 搜索工具
+short_desc: 免 Key 的联网搜索，自带广告与山寨站过滤
+desc: 同时抓取必应 RSS 与网页结果，去重后按可信度与相关度重排，自带广告过滤与山寨站识别，无需 API Key，提供 LLM Tool 与指令调用。
+version: v2.0.0
+author: ERX399
+repo: https://github.com/ERX399/websearch
+tags:
+  - 搜索
+  - 联网
+  - 网页
+  - 工具
+astrbot_version: ">=4.9.2"
+support_platforms: []
