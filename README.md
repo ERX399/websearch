@@ -1,4 +1,16 @@
+<div align="center">
+
+![:name](https://count.getloli.com/@websearch?name=websearch&theme=minecraft&padding=6&offset=0&align=top&scale=1&pixelated=1&darkmode=auto)
+
 # websearch
+
+_✨ 免 Key 联网搜索 · 必应 RSS + 网页双出口 ✨_
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub](https://img.shields.io/badge/作者-ERX399-blue)](https://github.com/ERX399)
+
+</div>
 
 给 AstrBot 用的联网搜索插件，不需要任何 API Key
 
