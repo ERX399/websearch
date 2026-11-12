@@ -336,6 +336,96 @@ class EngineParseTest(unittest.TestCase):
         self.assertFalse(engines.cooling("other"))
 
 
+EXA_TEXT = """Title: asyncio — Asynchronous I/O
+URL: https://docs.python.org/3/library/asyncio.html
+Published: 2025-09-25T08:00:00.000Z
+Author: Python
+
+Highlights:
+asyncio is a library to write concurrent code.
+
+---
+
+Title: Python 3.13 docs
+URL: https://docs.python.org/3/
+Published: N/A
+Author: Python
+
+Text:
+Official documentation.
+"""
+
+FIRECRAWL_TEXT = '{"success":true,"data":{"web":[{"url":"https://docs.python.org/3/","title":"Python 3","description":"Official docs"}]}}'
+
+PARALLEL_RESULT = {
+    "structuredContent": {
+        "results": [
+            {
+                "url": "https://docs.python.org/3/",
+                "title": "Python 3",
+                "publish_date": "2025-09-25",
+                "excerpts": ["first part", "second part"],
+            }
+        ]
+    }
+}
+
+
+class McpEngineTest(unittest.TestCase):
+    def setUp(self):
+        engines.BLOCKED_UNTIL.clear()
+
+    def test_resolve_mcp_aliases(self):
+        self.assertEqual(engines.resolve_engine("exa"), "exa")
+        self.assertEqual(engines.resolve_engine("FC"), "firecrawl")
+        self.assertEqual(engines.resolve_engine("parallel"), "parallel")
+        self.assertIn("exa", engines.KNOWN_ENGINES)
+
+    def test_decode_plain_json(self):
+        self.assertEqual(engines.decode_mcp('{"result":{}}'), {"result": {}})
+
+    def test_decode_sse_frame(self):
+        raw = 'event: message\ndata: {"result":{"content":[]}}\n\n'
+        self.assertEqual(engines.decode_mcp(raw), {"result": {"content": []}})
+
+    def test_parse_exa_blocks(self):
+        results = engines.parse_exa(EXA_TEXT)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            results[0]["url"], "https://docs.python.org/3/library/asyncio.html"
+        )
+        self.assertEqual(results[0]["date"], "2025 年 9 月 25 日")
+        self.assertIn("concurrent", results[0]["snippet"])
+        self.assertEqual(results[1]["date"], "")
+
+    def test_parse_firecrawl_payload(self):
+        results = engines.parse_firecrawl(FIRECRAWL_TEXT)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["engines"], ["firecrawl"])
+        self.assertEqual(results[0]["snippet"], "Official docs")
+
+    def test_parse_firecrawl_bad_json(self):
+        self.assertEqual(engines.parse_firecrawl("not json"), [])
+
+    def test_parse_parallel_excerpts(self):
+        results = engines.parse_parallel(PARALLEL_RESULT)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["date"], "2025 年 9 月 25 日")
+        self.assertIn("first part", results[0]["snippet"])
+
+    def test_mcp_call_uses_key_when_present(self):
+        old = engines.os.environ.get("FIRECRAWL_API_KEY")
+        engines.os.environ["FIRECRAWL_API_KEY"] = "test-key"
+        try:
+            headers = engines._mcp_headers("firecrawl", "")
+            self.assertEqual(headers["Authorization"], "Bearer test-key")
+        finally:
+            if old is None:
+                engines.os.environ.pop("FIRECRAWL_API_KEY", None)
+            else:
+                engines.os.environ["FIRECRAWL_API_KEY"] = old
+
+
 class FetchGuardTest(unittest.IsolatedAsyncioTestCase):
     async def test_public_ip_is_allowed(self):
         self.assertTrue(await fetcher.host_allowed("8.8.8.8"))

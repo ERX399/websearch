@@ -8,7 +8,7 @@ from .core.fetcher import fetch_page_text
 from .core.pipeline import web_search
 
 PLUGIN_NAME = "websearch"
-DEFAULT_ENGINES = ["bing_rss", "bing"]
+DEFAULT_ENGINES = ["exa", "bing_rss", "bing"]
 
 CONFIG_PATHS = {
     "max_results": ("search_settings", "max_results"),

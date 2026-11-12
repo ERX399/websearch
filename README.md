@@ -4,7 +4,7 @@
 
 # websearch
 
-_✨ 免 Key 联网搜索 · 必应 RSS + 网页双出口 ✨_
+_✨ 免 Key 联网搜索 · 必应双出口 + Exa / Firecrawl / Parallel ✨_
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -20,6 +20,7 @@ _✨ 免 Key 联网搜索 · 必应 RSS + 网页双出口 ✨_
 
 - **无需 API Key**，不需要代理，装上就能用
 - **两个出口同时抓**，必应 RSS 与必应网页并发检索：RSS 结构化、无广告、自带发布时间，排序权重更高
+- **三个免 Key 语义检索源**，Exa、Firecrawl、Parallel 走公开 MCP 端点，不需要填 Key，正文片段质量比网页解析更干净
 - **RRF 融合排序**，多个出口或引擎都命中的结果自动加权
 - **反广告**，识别必应的广告位、跳转广告与推广落地页
 - **反山寨**，品牌名撞域名但不是官方域名的站点直接打标，例如「Claude 中文版官网」这类
@@ -79,7 +80,7 @@ git clone https://github.com/ERX399/websearch.git
 
 | 配置项 | 类型 | 默认 | 说明 |
 | --- | --- | --- | --- |
-| `engines` | list | `["bing_rss", "bing"]` | 启用的搜索引擎，可选 `bing_rss`（必应 RSS）/ `bing`（必应网页），框架支持继续加 |
+| `engines` | list | `["exa", "bing_rss", "bing"]` | 启用的搜索引擎，可选 `exa` / `firecrawl` / `parallel`（免 Key 语义检索）/ `bing_rss`（必应 RSS）/ `bing`（必应网页） |
 | `max_results` | int | `8` | 默认返回条数，3 到 15 |
 | `timeout_seconds` | int | `15` | 单次请求超时 |
 | `cache_ttl` | int | `600` | 相同查询的缓存时长，0 表示不缓存 |
@@ -148,7 +149,9 @@ git clone https://github.com/ERX399/websearch.git
    ↓
 多引擎并发抓取 ──┬── 必应 RSS（优先）
                 ├── 必应网页
-                └── （可继续接入其它引擎）
+                ├── Exa（MCP，免 Key）
+                ├── Firecrawl（MCP，免 Key）
+                └── Parallel（MCP，免 Key）
    ↓
 按 URL 归一化合并（去掉 utm 等跟踪参数，保留有意义的查询参数）
    ↓
@@ -192,15 +195,20 @@ RRF   = Σ 出口权重 / (60 + 该出口中的排名)
 
 | 引擎 | 标识 | 状态 |
 | --- | --- | --- |
+| Exa | `exa` | 免 Key，语义检索，返回正文高亮片段，质量最稳，默认首选 |
+| Firecrawl | `firecrawl` | 免 Key，返回标题与摘要，覆盖面广 |
+| Parallel | `parallel` | 免 Key，只给摘要，条数不限，适合补充 |
 | 必应 RSS | `bing_rss` | 稳定，结构化、无广告、自带发布时间，每次最多 10 条，权重更高 |
 | 必应网页 | `bing` | 稳定，一次能拿更多结果，但夹广告位与跳转链接 |
 
 搜索引擎多不一定好用，这里只保留实测能稳住的
+Exa、Firecrawl、Parallel 是厂商给 agent 场景的公开 MCP 端点，不填 Key 也能调，但属于演示额度，高频会回 429，被限流后自动冷却
 360 搜索在机房出口 IP 下请求一多就回一个 200 的空壳页，DuckDuckGo 一律 202 限流，百度、搜狗、Startpage、Brave、Ecosia 分别是验证码、反爬、403 与 429，装了也只是白等超时，都没做适配
 
 ## 已知限制
 
-- **通用检索是必应单点**，两个出口都是必应，被它限流后只能等冷却（5 分钟），没有第二家能顶上来
+- **免 Key 通道是演示额度**，Exa、Firecrawl、Parallel 的公开 MCP 端点没有 SLA，用的人多了会回 429，被限流后只能等冷却
+- **通用检索仍以必应为主**，两个必应出口被限流后，只剩三个 MCP 源能顶，但它们对中文时效性内容不如必应
 - **必应 RSS 出口每次最多 10 条**，条数配置对它无效
 - **必应 RSS 出口不接受时间过滤**，`time_range` 传了也不生效，只有网页出口能按时间筛
 - **必应 RSS 出口对查不到的词也会硬返回 10 条近似结果**，所以「到底有没有结果」只能看网页出口，别拿 RSS 的条数当准

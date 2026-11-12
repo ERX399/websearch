@@ -65,8 +65,8 @@
       "engines": {
         "description": "启用的搜索引擎",
         "type": "list",
-        "default": ["bing_rss", "bing"],
-        "hint": "可选 bing_rss（必应 RSS，结构化、无广告、带发布时间、排序权重更高，但每次最多 10 条且不吃时间过滤）/ bing（必应网页，能按时间筛）；多选会并集去重后按可信度统一重排；其它引擎在机房出口 IP 下基本抓不动"
+        "default": ["exa", "bing_rss", "bing"],
+        "hint": "可选 exa（语义检索，免 Key，正文片段质量高）/ firecrawl（免 Key，带摘要）/ parallel（免 Key，摘要为主）/ bing_rss（结构化、无广告、带发布时间，每次最多 10 条且不吃时间过滤）/ bing（能按时间筛）；多选会并集去重后按可信度统一重排；免 Key 通道有频率限制，被限流会自动冷却，建议保留 bing_rss 兜底"
       },
       "query_optimize": {
         "description": "自动清洗搜索词",

@@ -246,7 +246,13 @@ SEARCH_PAGE_RE = re.compile(
 QUALITY_MIN = -100
 QUALITY_MAX = 100
 
-ENGINE_WEIGHT = {"bing_rss": 1.0, "bing": 0.85}
+ENGINE_WEIGHT = {
+    "bing_rss": 1.0,
+    "exa": 0.95,
+    "firecrawl": 0.9,
+    "bing": 0.85,
+    "parallel": 0.8,
+}
 
 BRAND_SEPS = "-_."
 

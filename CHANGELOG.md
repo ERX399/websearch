@@ -1,5 +1,20 @@
 # 更新日志
 
+## v2.1.0
+
+### 新增
+
+- 接入 Exa、Firecrawl、Parallel 三个免 Key 语义检索源，走公开 MCP 端点，不需要填写 API Key
+- 默认引擎改为 `["exa", "bing_rss", "bing"]`，语义检索优先，必应双出口兜底
+- 三个 MCP 源支持可选 Key：`EXA_API_KEY` / `FIRECRAWL_API_KEY` / `PARALLEL_API_KEY`，有 Key 时自动带上，额度更高
+- MCP 响应解析：兼容 JSON 与 SSE（`event: message` + `data:`）两种返回格式
+- 新增引擎别名 `fc`，以及对应单元测试
+
+### 变更
+
+- 排序权重：Exa 0.95、Firecrawl 0.9、Parallel 0.8，必应 RSS 1.0、必应网页 0.85 不变
+- README 补充免 Key 通道的额度说明与已知限制
+
 ## v2.0.0
 
 ### 新增

@@ -1,5 +1,7 @@
 import asyncio
 import html
+import json
+import os
 import re
 import time
 import urllib.parse
@@ -17,6 +19,10 @@ ENGINE_ALIASES = {
     "必应": "bing",
     "bing_rss": "bing_rss",
     "rss": "bing_rss",
+    "exa": "exa",
+    "firecrawl": "firecrawl",
+    "fc": "firecrawl",
+    "parallel": "parallel",
 }
 
 BLOCKED_UNTIL = {}
@@ -55,6 +61,26 @@ MONTHS = {
 }
 
 TIME_FILTERS = {"day": "ez1", "week": "ez2", "month": "ez3", "year": "ez4"}
+
+MCP_ENDPOINTS = {
+    "exa": "https://mcp.exa.ai/mcp",
+    "firecrawl": "https://mcp.firecrawl.dev/v2/mcp",
+    "parallel": "https://search.parallel.ai/mcp",
+}
+MCP_TOOLS = {
+    "exa": "web_search_exa",
+    "firecrawl": "firecrawl_search",
+    "parallel": "web_search",
+}
+MCP_KEYS = {
+    "exa": "EXA_API_KEY",
+    "firecrawl": "FIRECRAWL_API_KEY",
+    "parallel": "PARALLEL_API_KEY",
+}
+EXA_BLOCK_RE = re.compile(r"^URL:\s*(.+)$", re.M)
+EXA_TITLE_RE = re.compile(r"^Title:\s*(.+)$", re.M)
+EXA_DATE_RE = re.compile(r"^Published:\s*(.+)$", re.M)
+EXA_BODY_RE = re.compile(r"^(?:Highlights|Text):\s*\n?([\s\S]*)$", re.M)
 
 
 def _headers(user_agent, market="zh-CN"):
@@ -202,6 +228,155 @@ def parse_bing(page, filter_ads=True):
     return results, ads
 
 
+def _iso_date(raw):
+    text = clean_text(raw or "")
+    if not text or text.upper() == "N/A":
+        return ""
+    try:
+        stamp = time.strptime(text[:10], "%Y-%m-%d")
+    except Exception:
+        return ""
+    return f"{stamp.tm_year} 年 {stamp.tm_mon} 月 {stamp.tm_mday} 日"
+
+
+def _mcp_url(engine):
+    url = MCP_ENDPOINTS[engine]
+    if engine == "exa":
+        key = os.environ.get(MCP_KEYS["exa"], "").strip()
+        if key:
+            url += "?" + urllib.parse.urlencode({"exaApiKey": key})
+    return url
+
+
+def _mcp_headers(engine, user_agent):
+    headers = {
+        "User-Agent": user_agent or UA,
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+    key = os.environ.get(MCP_KEYS.get(engine, ""), "").strip()
+    if key and engine in ("firecrawl", "parallel"):
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
+
+
+def decode_mcp(raw):
+    text = (raw or "").strip()
+    if not text:
+        return {}
+    if text.startswith("event:") or "\ndata: " in text:
+        for line in text.splitlines():
+            if line.startswith("data: "):
+                text = line[6:]
+                break
+    return json.loads(text)
+
+
+def _first_text(result):
+    for part in (result or {}).get("content") or []:
+        if part.get("type") == "text" and part.get("text"):
+            return part["text"]
+    return ""
+
+
+async def _mcp_call(session, engine, tool, arguments, user_agent, timeout, proxy):
+    body = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {"name": tool, "arguments": arguments},
+    }
+    try:
+        async with session.post(
+            _mcp_url(engine),
+            json=body,
+            headers=_mcp_headers(engine, user_agent),
+            timeout=aiohttp.ClientTimeout(total=timeout),
+            proxy=proxy,
+        ) as resp:
+            if resp.status in (202, 403, 429):
+                _cool(engine)
+                return None, f"被限流({resp.status})"
+            if resp.status != 200:
+                return None, f"HTTP {resp.status}"
+            payload = decode_mcp(await resp.text(errors="ignore"))
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"
+    error = payload.get("error")
+    if error:
+        message = error.get("message") if isinstance(error, dict) else error
+        return None, f"MCP 错误: {message}"
+    return payload.get("result") or {}, ""
+
+
+def parse_exa(text):
+    results = []
+    for rank, block in enumerate(re.split(r"\n\n---\n\n", text or ""), 1):
+        hit = EXA_BLOCK_RE.search(block)
+        if not hit:
+            continue
+        url = hit.group(1).strip()
+        if not url.startswith("http"):
+            continue
+        title = EXA_TITLE_RE.search(block)
+        date = EXA_DATE_RE.search(block)
+        body = EXA_BODY_RE.search(block)
+        results.append(
+            _item(
+                "exa",
+                rank,
+                title.group(1) if title else "",
+                url,
+                body.group(1) if body else "",
+                _iso_date(date.group(1) if date else ""),
+            )
+        )
+    return results
+
+
+def parse_firecrawl(text):
+    try:
+        data = json.loads(text or "{}")
+    except Exception:
+        return []
+    rows = ((data or {}).get("data") or {}).get("web") or []
+    results = []
+    for rank, row in enumerate(rows, 1):
+        url = str(row.get("url") or "").strip()
+        if not url.startswith("http"):
+            continue
+        results.append(
+            _item(
+                "firecrawl",
+                rank,
+                row.get("title") or "",
+                url,
+                row.get("description") or "",
+            )
+        )
+    return results
+
+
+def parse_parallel(result):
+    rows = ((result or {}).get("structuredContent") or {}).get("results") or []
+    results = []
+    for rank, row in enumerate(rows, 1):
+        url = str(row.get("url") or "").strip()
+        if not url.startswith("http"):
+            continue
+        results.append(
+            _item(
+                "parallel",
+                rank,
+                row.get("title") or "",
+                url,
+                "\n\n".join(row.get("excerpts") or []),
+                _iso_date(row.get("publish_date") or ""),
+            )
+        )
+    return results
+
+
 async def search_engine(
     session,
     engine,
@@ -294,10 +469,49 @@ async def search_engine(
             "results": results[:count],
             "ads": ads,
         }
+    if engine in MCP_ENDPOINTS:
+        if engine == "exa":
+            arguments = {"query": query, "numResults": count}
+        elif engine == "firecrawl":
+            arguments = {"query": query, "limit": count}
+        else:
+            arguments = {"objective": query, "search_queries": [query]}
+        result, err = await _mcp_call(
+            session, engine, MCP_TOOLS[engine], arguments, user_agent, timeout, proxy
+        )
+        if err:
+            return {
+                "engine": engine,
+                "ok": False,
+                "error": err,
+                "results": [],
+                "ads": 0,
+            }
+        if engine == "exa":
+            results = parse_exa(_first_text(result))
+        elif engine == "firecrawl":
+            results = parse_firecrawl(_first_text(result))
+        else:
+            results = parse_parallel(result)
+        if not results:
+            return {
+                "engine": engine,
+                "ok": False,
+                "error": "无结果",
+                "results": [],
+                "ads": 0,
+            }
+        return {
+            "engine": engine,
+            "ok": True,
+            "error": "",
+            "results": results[:count],
+            "ads": 0,
+        }
     return {"engine": engine, "ok": False, "error": "未知引擎", "results": [], "ads": 0}
 
 
-KNOWN_ENGINES = ("bing_rss", "bing")
+KNOWN_ENGINES = ("bing_rss", "bing", "exa", "firecrawl", "parallel")
 
 
 async def search_many(
